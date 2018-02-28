@@ -12,12 +12,7 @@ type Queue struct {
 }
 
 // NewQueue returns a new synced queue
-func NewQueue() Queue {
-	return Queue{
-		[]interface{}{},
-		sync.Mutex{},
-	}
-}
+func NewQueue() Queue { return Queue{[]interface{}{}, sync.Mutex{}} }
 
 // Push pushed an object to a queue
 func (q *Queue) Push(object interface{}) {

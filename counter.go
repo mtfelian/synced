@@ -9,31 +9,33 @@ type Counter struct {
 }
 
 // NewCounter returns a new synced counter initialized by initialValue
-func NewCounter(initialValue int) Counter {
-	return Counter{
-		initialValue,
-		sync.Mutex{},
-	}
-}
+func NewCounter(initialValue int) Counter { return Counter{initialValue, sync.Mutex{}} }
 
-// Inc increases counter value by 1
+// Inc increases counter by 1
 func (c *Counter) Inc() {
 	c.Lock()
 	c.count++
 	c.Unlock()
 }
 
-// Add adds i to a counter's value
+// Add i to counter
 func (c *Counter) Add(i int) {
 	c.Lock()
 	c.count += i
 	c.Unlock()
 }
 
-// Dec decreases counter value by 1
+// Dec decreases counter by 1
 func (c *Counter) Dec() {
 	c.Lock()
 	c.count--
+	c.Unlock()
+}
+
+// Set counter to i
+func (c *Counter) Set(i int) {
+	c.Lock()
+	c.count = i
 	c.Unlock()
 }
 
