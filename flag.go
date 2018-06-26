@@ -12,22 +12,22 @@ type Flag struct {
 func NewFlag(initialState bool) Flag { return Flag{initialState, sync.Mutex{}} }
 
 // Set the flag
-func (c *Flag) Set() {
-	c.Lock()
-	c.state = true
-	c.Unlock()
+func (f *Flag) Set() {
+	f.Lock()
+	f.state = true
+	f.Unlock()
 }
 
 // Unset the flag
-func (c *Flag) Unset() {
-	c.Lock()
-	c.state = false
-	c.Unlock()
+func (f *Flag) Unset() {
+	f.Lock()
+	f.state = false
+	f.Unlock()
 }
 
 // Get returns current flag state
-func (c *Flag) Get() bool {
-	c.Lock()
-	defer c.Unlock()
-	return c.state
+func (f *Flag) Get() bool {
+	f.Lock()
+	defer f.Unlock()
+	return f.state
 }
