@@ -14,7 +14,8 @@ const (
 
 // various constants
 const (
-	QueueLatestElement = -1
+	QueueLatestElement       = -1
+	QueueBeforeLatestElement = -2
 )
 
 // errors
@@ -103,10 +104,13 @@ func (q *Queue) get(pos int) (interface{}, error) {
 		return nil, ErrQueueIsEmpty
 	case pos > l-1:
 		return nil, ErrOutOfBounds
-	case pos == QueueLatestElement:
-		pos = l - 1
+	case pos < 0:
+		pos += l
+		if pos < 0 {
+			return nil, ErrOutOfBounds
+		}
 	}
-	return q.queue[0], nil
+	return q.queue[pos], nil
 }
 
 // Get element at position pos but don't pop it, 0 is the most early element, -1 is the latest
