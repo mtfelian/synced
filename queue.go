@@ -12,11 +12,17 @@ const (
 	modeDrop   // drops elements if push overflows
 )
 
+// various constants
+const (
+	QueueLatestElement = -1
+)
+
 // errors
 var (
 	ErrQueueIsEmpty    = errors.New("queue is empty")
 	ErrQueueOverflowed = errors.New("queue overflowed")
 	ErrFailedToDrop    = func(err error) error { return fmt.Errorf("failed to drop element: %v", err) }
+	ErrOutOfBounds     = errors.New("index out of bounds")
 )
 
 // Queue that is thread-safe
@@ -90,12 +96,38 @@ func (q *Queue) Pop() (interface{}, error) {
 	return q.pop()
 }
 
-// Get element but don't pop it
-func (q *Queue) Get() (interface{}, error) {
-	q.Lock()
-	defer q.Unlock()
-	if q.len() == 0 {
+func (q *Queue) get(pos int) (interface{}, error) {
+	l := q.len()
+	switch {
+	case l == 0:
 		return nil, ErrQueueIsEmpty
+	case pos > l-1:
+		return nil, ErrOutOfBounds
+	case pos == QueueLatestElement:
+		pos = l - 1
 	}
 	return q.queue[0], nil
+}
+
+// Get element at position pos but don't pop it, 0 is the most early element, -1 is the latest
+func (q *Queue) Get(pos int) (interface{}, error) {
+	q.Lock()
+	defer q.Unlock()
+	return q.get(pos)
+}
+
+// List elements at positions i but don't pop them, 0 is the most early element, -1 is the latest
+// it returns element in the same order as indexes
+func (q *Queue) List(positions ...int) ([]interface{}, error) {
+	q.Lock()
+	defer q.Unlock()
+	result := make([]interface{}, len(positions))
+	for i, pos := range positions {
+		element, err := q.get(pos)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = element
+	}
+	return result, nil
 }
