@@ -97,6 +97,15 @@ func (q *Queue) Pop() (interface{}, error) {
 	return q.pop()
 }
 
+// Clear the queue
+func (q *Queue) Clear() {
+	q.Lock()
+	defer q.Unlock()
+	for q.len() > 0 {
+		_, _ = q.pop()
+	}
+}
+
 func (q *Queue) get(pos int) (interface{}, error) {
 	l := q.len()
 	switch {
