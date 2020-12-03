@@ -21,6 +21,13 @@ func (f *Flag) Set() {
 	f.Unlock()
 }
 
+// SetState of the flag
+func (f *Flag) SetState(state bool) {
+	f.Lock()
+	f.state = state
+	f.Unlock()
+}
+
 // Unset the flag
 func (f *Flag) Unset() {
 	f.Lock()
