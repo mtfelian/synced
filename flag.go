@@ -1,6 +1,9 @@
 package synced
 
-import "sync"
+import (
+	"encoding/json"
+	"sync"
+)
 
 // Flag that is thread-safe
 type Flag struct {
@@ -30,4 +33,23 @@ func (f *Flag) Get() bool {
 	f.Lock()
 	defer f.Unlock()
 	return f.state
+}
+
+// MarshalJSON implements json.Marshaler
+func (f *Flag) MarshalJSON() ([]byte, error) {
+	f.Lock()
+	defer f.Unlock()
+	return json.Marshal(f.state)
+}
+
+// UnmarshalJSON implements json.Unmarshaler
+func (f *Flag) UnmarshalJSON(data []byte) error {
+	var state bool
+	if err := json.Unmarshal(data, &state); err != nil {
+		return err
+	}
+	f.Lock()
+	f.state = state
+	f.Unlock()
+	return nil
 }

@@ -1,6 +1,9 @@
 package synced
 
-import "sync"
+import (
+	"encoding/json"
+	"sync"
+)
 
 // Counter that is thread-safe
 type Counter struct {
@@ -58,4 +61,23 @@ func (c *Counter) Get() int {
 	c.Lock()
 	defer c.Unlock()
 	return c.count
+}
+
+// MarshalJSON implements json.Marshaler
+func (c *Counter) MarshalJSON() ([]byte, error) {
+	c.Lock()
+	defer c.Unlock()
+	return json.Marshal(c.count)
+}
+
+// UnmarshalJSON implements json.Unmarshaler
+func (c *Counter) UnmarshalJSON(data []byte) error {
+	var count int
+	if err := json.Unmarshal(data, &count); err != nil {
+		return err
+	}
+	c.Lock()
+	c.count = count
+	c.Unlock()
+	return nil
 }
