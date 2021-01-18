@@ -9,15 +9,14 @@ import (
 // Mutex adds debugging-related functionality to sync.Mutex.
 // It is coded on top of sync.RWMutex to minimize code duplication.
 type Mutex struct {
-	mu                  sync.RWMutex
-	callbacksMu         sync.Mutex
-	Name                string
-	BeforeLock          func()
-	AfterLock           func()
-	BeforeUnlock        func()
-	AfterUnlock         func()
-	BeforeUnlockRecover func()
-	AfterUnlockRecover  func(r interface{})
+	mu                 sync.RWMutex
+	callbacksMu        sync.Mutex
+	Name               string
+	BeforeLock         func()
+	AfterLock          func()
+	BeforeUnlock       func()
+	AfterUnlock        func()
+	AfterUnlockRecover func(r interface{})
 }
 
 func printStackTrace(b []byte) {
@@ -40,13 +39,12 @@ func defaultMutexCallback1(event, mname, name string, addStackTrace bool, r inte
 func NewMutex(name string, addStackTrace bool) *Mutex {
 	const mname = "Mutex"
 	return &Mutex{
-		Name:                name,
-		BeforeLock:          func() { defaultMutexCallback("BeforeLock", mname, name, addStackTrace) },
-		AfterLock:           func() { defaultMutexCallback("AfterLock", mname, name, addStackTrace) },
-		BeforeUnlock:        func() { defaultMutexCallback("BeforeUnlock", mname, name, addStackTrace) },
-		AfterUnlock:         func() { defaultMutexCallback("AfterUnlock", mname, name, addStackTrace) },
-		BeforeUnlockRecover: func() { defaultMutexCallback("BeforeUnlockRecover", mname, name, addStackTrace) },
-		AfterUnlockRecover:  func(r interface{}) { defaultMutexCallback1("AfterUnlockRecover", mname, name, addStackTrace, r) },
+		Name:               name,
+		BeforeLock:         func() { defaultMutexCallback("BeforeLock", mname, name, addStackTrace) },
+		AfterLock:          func() { defaultMutexCallback("AfterLock", mname, name, addStackTrace) },
+		BeforeUnlock:       func() { defaultMutexCallback("BeforeUnlock", mname, name, addStackTrace) },
+		AfterUnlock:        func() { defaultMutexCallback("AfterUnlock", mname, name, addStackTrace) },
+		AfterUnlockRecover: func(r interface{}) { defaultMutexCallback1("AfterUnlockRecover", mname, name, addStackTrace, r) },
 	}
 }
 
@@ -86,16 +84,10 @@ func (m *Mutex) Unlock() {
 	}()
 
 	defer func() {
-		func() {
-			m.callbacksMu.Lock()
-			defer m.callbacksMu.Unlock()
-			if m.BeforeUnlockRecover != nil {
-				m.BeforeUnlockRecover()
-			}
-		}()
-
 		r := recover()
-
+		if r == nil {
+			return
+		}
 		func() {
 			m.callbacksMu.Lock()
 			defer m.callbacksMu.Unlock()

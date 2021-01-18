@@ -3,25 +3,23 @@ package synced
 // RWMutex adds debugging-related functionality to sync.RWMutex
 type RWMutex struct {
 	*Mutex
-	BeforeRLock          func()
-	AfterRLock           func()
-	BeforeRUnlock        func()
-	AfterRUnlock         func()
-	BeforeRUnlockRecover func()
-	AfterRUnlockRecover  func(r interface{})
+	BeforeRLock         func()
+	AfterRLock          func()
+	BeforeRUnlock       func()
+	AfterRUnlock        func()
+	AfterRUnlockRecover func(r interface{})
 }
 
 // NewRWMutex returns a pointer to a new RWMutex with default callbacks assigned
 func NewRWMutex(name string, addStackTrace bool) *RWMutex {
 	const mname = "RWMutex"
 	return &RWMutex{
-		Mutex:                NewMutex(name, addStackTrace),
-		BeforeRLock:          func() { defaultMutexCallback("BeforeRLock", mname, name, addStackTrace) },
-		AfterRLock:           func() { defaultMutexCallback("AfterRLock", mname, name, addStackTrace) },
-		BeforeRUnlock:        func() { defaultMutexCallback("BeforeRUnlock", mname, name, addStackTrace) },
-		AfterRUnlock:         func() { defaultMutexCallback("AfterRUnlock", mname, name, addStackTrace) },
-		BeforeRUnlockRecover: func() { defaultMutexCallback("BeforeRUnlockRecover", mname, name, addStackTrace) },
-		AfterRUnlockRecover:  func(r interface{}) { defaultMutexCallback1("AfterRUnlockRecover", mname, name, addStackTrace, r) },
+		Mutex:               NewMutex(name, addStackTrace),
+		BeforeRLock:         func() { defaultMutexCallback("BeforeRLock", mname, name, addStackTrace) },
+		AfterRLock:          func() { defaultMutexCallback("AfterRLock", mname, name, addStackTrace) },
+		BeforeRUnlock:       func() { defaultMutexCallback("BeforeRUnlock", mname, name, addStackTrace) },
+		AfterRUnlock:        func() { defaultMutexCallback("AfterRUnlock", mname, name, addStackTrace) },
+		AfterRUnlockRecover: func(r interface{}) { defaultMutexCallback1("AfterRUnlockRecover", mname, name, addStackTrace, r) },
 	}
 }
 
@@ -61,16 +59,10 @@ func (m *RWMutex) RUnlock() {
 	}()
 
 	defer func() {
-		func() {
-			m.callbacksMu.Lock()
-			defer m.callbacksMu.Unlock()
-			if m.BeforeRUnlockRecover != nil {
-				m.BeforeRUnlockRecover()
-			}
-		}()
-
 		r := recover()
-
+		if r == nil {
+			return
+		}
 		func() {
 			m.callbacksMu.Lock()
 			defer m.callbacksMu.Unlock()
