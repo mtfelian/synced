@@ -11,16 +11,17 @@ type RWMutex struct {
 }
 
 // NewRWMutex returns a pointer to a new RWMutex with default callbacks assigned
-func NewRWMutex(name string, addStackTrace bool) *RWMutex {
+func NewRWMutex(name string, setDefaultCallbacks, addStackTrace bool) *RWMutex {
 	const mname = "RWMutex"
-	return &RWMutex{
-		Mutex:               NewMutex(name, addStackTrace),
-		BeforeRLock:         func() { defaultMutexCallback("BeforeRLock", mname, name, addStackTrace) },
-		AfterRLock:          func() { defaultMutexCallback("AfterRLock", mname, name, addStackTrace) },
-		BeforeRUnlock:       func() { defaultMutexCallback("BeforeRUnlock", mname, name, addStackTrace) },
-		AfterRUnlock:        func() { defaultMutexCallback("AfterRUnlock", mname, name, addStackTrace) },
-		AfterRUnlockRecover: func(r interface{}) { defaultMutexCallback1("AfterRUnlockRecover", mname, name, addStackTrace, r) },
+	m := &RWMutex{Mutex: NewMutex(name, setDefaultCallbacks, addStackTrace)}
+	if setDefaultCallbacks {
+		m.BeforeRLock = func() { defaultMutexCallback("BeforeRLock", mname, name, addStackTrace) }
+		m.AfterRLock = func() { defaultMutexCallback("AfterRLock", mname, name, addStackTrace) }
+		m.BeforeRUnlock = func() { defaultMutexCallback("BeforeRUnlock", mname, name, addStackTrace) }
+		m.AfterRUnlock = func() { defaultMutexCallback("AfterRUnlock", mname, name, addStackTrace) }
+		m.AfterRUnlockRecover = func(r interface{}) { defaultMutexCallback1("AfterRUnlockRecover", mname, name, addStackTrace, r) }
 	}
+	return m
 }
 
 // RLock calls the underlying RWMutex.RLock method. BeforeRLock and AfterRLock callbacks will be executed

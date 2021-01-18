@@ -36,16 +36,17 @@ func defaultMutexCallback1(event, mname, name string, addStackTrace bool, r inte
 }
 
 // NewMutex returns a pointer to a new Mutex with default callbacks assigned
-func NewMutex(name string, addStackTrace bool) *Mutex {
+func NewMutex(name string, setDefaultCallbacks, addStackTrace bool) *Mutex {
 	const mname = "Mutex"
-	return &Mutex{
-		Name:               name,
-		BeforeLock:         func() { defaultMutexCallback("BeforeLock", mname, name, addStackTrace) },
-		AfterLock:          func() { defaultMutexCallback("AfterLock", mname, name, addStackTrace) },
-		BeforeUnlock:       func() { defaultMutexCallback("BeforeUnlock", mname, name, addStackTrace) },
-		AfterUnlock:        func() { defaultMutexCallback("AfterUnlock", mname, name, addStackTrace) },
-		AfterUnlockRecover: func(r interface{}) { defaultMutexCallback1("AfterUnlockRecover", mname, name, addStackTrace, r) },
+	m := &Mutex{Name: name}
+	if setDefaultCallbacks {
+		m.BeforeLock = func() { defaultMutexCallback("BeforeLock", mname, name, addStackTrace) }
+		m.AfterLock = func() { defaultMutexCallback("AfterLock", mname, name, addStackTrace) }
+		m.BeforeUnlock = func() { defaultMutexCallback("BeforeUnlock", mname, name, addStackTrace) }
+		m.AfterUnlock = func() { defaultMutexCallback("AfterUnlock", mname, name, addStackTrace) }
+		m.AfterUnlockRecover = func(r interface{}) { defaultMutexCallback1("AfterUnlockRecover", mname, name, addStackTrace, r) }
 	}
+	return m
 }
 
 // Lock calls the underlying Mutex.Lock method. BeforeLock and AfterLock callbacks will be executed
