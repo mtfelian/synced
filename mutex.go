@@ -54,7 +54,7 @@ type MutexParams struct {
 func NewMutex(p MutexParams) *Mutex {
 	const mname = "Mutex"
 	m := &Mutex{Name: p.Name}
-	haveWarningTimeout := p.Timeout >= time.Second
+	haveWarningTimeout := p.Timeout > 0
 	if haveWarningTimeout {
 		m.ticker = time.NewTicker(p.Timeout)
 		m.closeC = make(chan struct{})
