@@ -4,14 +4,21 @@ import (
 	"log"
 	"runtime/debug"
 	"sync"
+	"time"
 )
 
 // Mutex adds debugging-related functionality to sync.Mutex.
 // It is coded on top of sync.RWMutex to minimize code duplication.
 type Mutex struct {
-	mu                 sync.RWMutex
-	callbacksMu        sync.Mutex
-	Name               string
+	mu          sync.RWMutex
+	callbacksMu sync.Mutex
+	Name        string
+
+	lockedAt time.Time
+	timeout  time.Duration
+	ticker   *time.Ticker
+	closeC   chan struct{}
+
 	BeforeLock         func()
 	AfterLock          func()
 	BeforeUnlock       func()
@@ -35,16 +42,44 @@ func defaultMutexCallback1(event, mname, name string, addStackTrace bool, r inte
 	}
 }
 
+// MutexParams are mutex parameters
+type MutexParams struct {
+	Name                string
+	SetDefaultCallbacks bool
+	AddStackTrace       bool
+	Timeout             time.Duration
+}
+
 // NewMutex returns a pointer to a new Mutex with default callbacks assigned
-func NewMutex(name string, setDefaultCallbacks, addStackTrace bool) *Mutex {
+func NewMutex(p MutexParams) *Mutex {
 	const mname = "Mutex"
-	m := &Mutex{Name: name}
-	if setDefaultCallbacks {
-		m.BeforeLock = func() { defaultMutexCallback("BeforeLock", mname, name, addStackTrace) }
-		m.AfterLock = func() { defaultMutexCallback("AfterLock", mname, name, addStackTrace) }
-		m.BeforeUnlock = func() { defaultMutexCallback("BeforeUnlock", mname, name, addStackTrace) }
-		m.AfterUnlock = func() { defaultMutexCallback("AfterUnlock", mname, name, addStackTrace) }
-		m.AfterUnlockRecover = func(r interface{}) { defaultMutexCallback1("AfterUnlockRecover", mname, name, addStackTrace, r) }
+	m := &Mutex{Name: p.Name, ticker: time.NewTicker(p.Timeout), closeC: make(chan struct{})}
+	if p.SetDefaultCallbacks {
+		m.BeforeLock = func() { defaultMutexCallback("BeforeLock", mname, p.Name, p.AddStackTrace) }
+		m.AfterLock = func() {
+			defaultMutexCallback("AfterLock", mname, p.Name, p.AddStackTrace)
+			m.closeC = make(chan struct{})
+			m.lockedAt = time.Now()
+			go func() {
+				for {
+					select {
+					case <-m.ticker.C:
+						log.Printf("%s %s is locked for %s", mname, p.Name, time.Now().Sub(m.lockedAt))
+					case <-m.closeC:
+						return
+					}
+				}
+			}()
+			m.ticker.Reset(m.timeout)
+		}
+		m.BeforeUnlock = func() {
+			m.ticker.Stop()
+			m.lockedAt = time.Time{}
+			m.closeC <- struct{}{}
+			defaultMutexCallback("BeforeUnlock", mname, p.Name, p.AddStackTrace)
+		}
+		m.AfterUnlock = func() { defaultMutexCallback("AfterUnlock", mname, p.Name, p.AddStackTrace) }
+		m.AfterUnlockRecover = func(r interface{}) { defaultMutexCallback1("AfterUnlockRecover", mname, p.Name, p.AddStackTrace, r) }
 	}
 	return m
 }

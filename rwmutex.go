@@ -3,6 +3,7 @@ package synced
 // RWMutex adds debugging-related functionality to sync.RWMutex
 type RWMutex struct {
 	*Mutex
+
 	BeforeRLock         func()
 	AfterRLock          func()
 	BeforeRUnlock       func()
@@ -11,15 +12,15 @@ type RWMutex struct {
 }
 
 // NewRWMutex returns a pointer to a new RWMutex with default callbacks assigned
-func NewRWMutex(name string, setDefaultCallbacks, addStackTrace bool) *RWMutex {
+func NewRWMutex(p MutexParams) *RWMutex {
 	const mname = "RWMutex"
-	m := &RWMutex{Mutex: NewMutex(name, setDefaultCallbacks, addStackTrace)}
-	if setDefaultCallbacks {
-		m.BeforeRLock = func() { defaultMutexCallback("BeforeRLock", mname, name, addStackTrace) }
-		m.AfterRLock = func() { defaultMutexCallback("AfterRLock", mname, name, addStackTrace) }
-		m.BeforeRUnlock = func() { defaultMutexCallback("BeforeRUnlock", mname, name, addStackTrace) }
-		m.AfterRUnlock = func() { defaultMutexCallback("AfterRUnlock", mname, name, addStackTrace) }
-		m.AfterRUnlockRecover = func(r interface{}) { defaultMutexCallback1("AfterRUnlockRecover", mname, name, addStackTrace, r) }
+	m := &RWMutex{Mutex: NewMutex(p)}
+	if p.SetDefaultCallbacks {
+		m.BeforeRLock = func() { defaultMutexCallback("BeforeRLock", mname, p.Name, p.AddStackTrace) }
+		m.AfterRLock = func() { defaultMutexCallback("AfterRLock", mname, p.Name, p.AddStackTrace) }
+		m.BeforeRUnlock = func() { defaultMutexCallback("BeforeRUnlock", mname, p.Name, p.AddStackTrace) }
+		m.AfterRUnlock = func() { defaultMutexCallback("AfterRUnlock", mname, p.Name, p.AddStackTrace) }
+		m.AfterRUnlockRecover = func(r interface{}) { defaultMutexCallback1("AfterRUnlockRecover", mname, p.Name, p.AddStackTrace, r) }
 	}
 	return m
 }
