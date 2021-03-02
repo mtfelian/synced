@@ -53,29 +53,38 @@ type MutexParams struct {
 // NewMutex returns a pointer to a new Mutex with default callbacks assigned
 func NewMutex(p MutexParams) *Mutex {
 	const mname = "Mutex"
-	m := &Mutex{Name: p.Name, ticker: time.NewTicker(p.Timeout), closeC: make(chan struct{})}
+	m := &Mutex{Name: p.Name}
+	haveWarningTimeout := p.Timeout >= time.Second
+	if haveWarningTimeout {
+		m.ticker = time.NewTicker(p.Timeout)
+		m.closeC = make(chan struct{})
+	}
 	if p.SetDefaultCallbacks {
 		m.BeforeLock = func() { defaultMutexCallback("BeforeLock", mname, p.Name, p.AddStackTrace) }
 		m.AfterLock = func() {
 			defaultMutexCallback("AfterLock", mname, p.Name, p.AddStackTrace)
-			m.closeC = make(chan struct{})
-			m.lockedAt = time.Now()
-			go func() {
-				for {
-					select {
-					case <-m.ticker.C:
-						log.Printf("%s %s is locked for %s", mname, p.Name, time.Now().Sub(m.lockedAt))
-					case <-m.closeC:
-						return
+			if haveWarningTimeout {
+				m.closeC = make(chan struct{})
+				m.lockedAt = time.Now()
+				go func() {
+					for {
+						select {
+						case <-m.ticker.C:
+							log.Printf("%s %s is locked for %s", mname, p.Name, time.Now().Sub(m.lockedAt))
+						case <-m.closeC:
+							return
+						}
 					}
-				}
-			}()
-			m.ticker.Reset(m.timeout)
+				}()
+				m.ticker.Reset(m.timeout)
+			}
 		}
 		m.BeforeUnlock = func() {
-			m.ticker.Stop()
-			m.lockedAt = time.Time{}
-			m.closeC <- struct{}{}
+			if haveWarningTimeout {
+				m.ticker.Stop()
+				m.lockedAt = time.Time{}
+				m.closeC <- struct{}{}
+			}
 			defaultMutexCallback("BeforeUnlock", mname, p.Name, p.AddStackTrace)
 		}
 		m.AfterUnlock = func() { defaultMutexCallback("AfterUnlock", mname, p.Name, p.AddStackTrace) }
