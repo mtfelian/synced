@@ -16,11 +16,11 @@ func NewRWMutex(p MutexParams) *RWMutex {
 	const mname = "RWMutex"
 	m := &RWMutex{Mutex: NewMutex(p)}
 	if p.SetDefaultCallbacks {
-		m.BeforeRLock = func() { defaultMutexCallback("BeforeRLock", mname, p.Name, p.AddStackTrace) }
-		m.AfterRLock = func() { defaultMutexCallback("AfterRLock", mname, p.Name, p.AddStackTrace) }
-		m.BeforeRUnlock = func() { defaultMutexCallback("BeforeRUnlock", mname, p.Name, p.AddStackTrace) }
-		m.AfterRUnlock = func() { defaultMutexCallback("AfterRUnlock", mname, p.Name, p.AddStackTrace) }
-		m.AfterRUnlockRecover = func(r interface{}) { defaultMutexCallback1("AfterRUnlockRecover", mname, p.Name, p.AddStackTrace, r) }
+		m.BeforeRLock = func() { m.defaultCallback("BeforeRLock", mname, p) }
+		m.AfterRLock = func() { m.defaultCallback("AfterRLock", mname, p) }
+		m.BeforeRUnlock = func() { m.defaultCallback("BeforeRUnlock", mname, p) }
+		m.AfterRUnlock = func() { m.defaultCallback("AfterRUnlock", mname, p) }
+		m.AfterRUnlockRecover = func(r interface{}) { m.defaultCallback1("AfterRUnlockRecover", mname, p, r) }
 	}
 	return m
 }

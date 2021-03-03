@@ -1,6 +1,7 @@
 package synced
 
 import (
+	"fmt"
 	"log"
 	"runtime/debug"
 	"sync"
@@ -19,6 +20,8 @@ type Mutex struct {
 	ticker   *time.Ticker
 	closeC   chan struct{}
 
+	lockTag *string
+
 	BeforeLock         func()
 	AfterLock          func()
 	BeforeUnlock       func()
@@ -26,18 +29,26 @@ type Mutex struct {
 	AfterUnlockRecover func(r interface{})
 }
 
-func printStackTrace(b []byte) {
-	log.Println("StackTrace: " + string(b))
-}
-func defaultMutexCallback(event, mname, name string, addStackTrace bool) {
-	log.Printf("%s for %s %s", event, mname, name)
-	if addStackTrace {
+func printStackTrace(b []byte) { log.Println("StackTrace: " + string(b)) }
+
+func (m *Mutex) defaultCallback(event, mname string, p MutexParams) {
+	var tagInfo string
+	if m.lockTag != nil {
+		tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
+	}
+	log.Printf("%s for %s %s%s", event, mname, m.Name, tagInfo)
+	if p.AddStackTrace {
 		printStackTrace(debug.Stack())
 	}
 }
-func defaultMutexCallback1(event, mname, name string, addStackTrace bool, r interface{}) {
-	log.Printf("%s for %s %s: %v", event, mname, name, r)
-	if addStackTrace {
+
+func (m *Mutex) defaultCallback1(event, mname string, p MutexParams, r interface{}) {
+	var tagInfo string
+	if m.lockTag != nil {
+		tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
+	}
+	log.Printf("%s for %s %s%s: %v", event, mname, m.Name, tagInfo, r)
+	if p.AddStackTrace {
 		printStackTrace(debug.Stack())
 	}
 }
@@ -60,9 +71,9 @@ func NewMutex(p MutexParams) *Mutex {
 		m.closeC = make(chan struct{})
 	}
 	if p.SetDefaultCallbacks {
-		m.BeforeLock = func() { defaultMutexCallback("BeforeLock", mname, p.Name, p.AddStackTrace) }
+		m.BeforeLock = func() { m.defaultCallback("BeforeLock", mname, p) }
 		m.AfterLock = func() {
-			defaultMutexCallback("AfterLock", mname, p.Name, p.AddStackTrace)
+			m.defaultCallback("AfterLock", mname, p)
 			if haveWarningTimeout {
 				m.closeC = make(chan struct{})
 				m.lockedAt = time.Now()
@@ -70,7 +81,11 @@ func NewMutex(p MutexParams) *Mutex {
 					for {
 						select {
 						case <-m.ticker.C:
-							log.Printf("%s %s is locked for %s", mname, p.Name, time.Now().Sub(m.lockedAt))
+							var tagInfo string
+							if m.lockTag != nil {
+								tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
+							}
+							log.Printf("%s %s%s is locked for %s", mname, p.Name, tagInfo, time.Now().Sub(m.lockedAt))
 						case <-m.closeC:
 							return
 						}
@@ -85,17 +100,15 @@ func NewMutex(p MutexParams) *Mutex {
 				m.lockedAt = time.Time{}
 				m.closeC <- struct{}{}
 			}
-			defaultMutexCallback("BeforeUnlock", mname, p.Name, p.AddStackTrace)
+			m.defaultCallback("BeforeUnlock", mname, p)
 		}
-		m.AfterUnlock = func() { defaultMutexCallback("AfterUnlock", mname, p.Name, p.AddStackTrace) }
-		m.AfterUnlockRecover = func(r interface{}) { defaultMutexCallback1("AfterUnlockRecover", mname, p.Name, p.AddStackTrace, r) }
+		m.AfterUnlock = func() { m.defaultCallback("AfterUnlock", mname, p) }
+		m.AfterUnlockRecover = func(r interface{}) { m.defaultCallback1("AfterUnlockRecover", mname, p, r) }
 	}
 	return m
 }
 
-// Lock calls the underlying Mutex.Lock method. BeforeLock and AfterLock callbacks will be executed
-// before and after such call respectively. If callback was not specified, it will be ignored.
-func (m *Mutex) Lock() {
+func (m *Mutex) lock(tag *string) {
 	func() {
 		m.callbacksMu.Lock()
 		defer m.callbacksMu.Unlock()
@@ -109,11 +122,21 @@ func (m *Mutex) Lock() {
 	func() {
 		m.callbacksMu.Lock()
 		defer m.callbacksMu.Unlock()
+		if tag != nil {
+			m.lockTag = tag
+		}
 		if m.AfterLock != nil {
 			m.AfterLock()
 		}
 	}()
 }
+
+// Lock calls the underlying Mutex.Lock method. BeforeLock and AfterLock callbacks will be executed
+// before and after such call respectively. If callback was not specified, it will be ignored.
+func (m *Mutex) Lock() { m.lock(nil) }
+
+// LockWithTag works like Lock but adds a specified tag to help in debugging process
+func (m *Mutex) LockWithTag(tag string) { m.lock(&tag) }
 
 // Unlock calls the underlying Mutex.Unlock method. BeforeUnlock and AfterUnlock callbacks will be executed
 // before and after such call respectively. If a panic will occur at underlying Mutex unlocking, it will be
@@ -141,6 +164,7 @@ func (m *Mutex) Unlock() {
 			}
 		}()
 	}()
+	m.lockTag = nil
 	m.mu.Unlock()
 
 	func() {
