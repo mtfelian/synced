@@ -13,11 +13,9 @@ import (
 type Mutex struct {
 	mu          sync.RWMutex
 	callbacksMu sync.Mutex
-	Name        string
 
 	lockedAt   time.Time
 	lockedAtMu sync.Mutex
-	timeout    time.Duration
 	ticker     *time.Ticker
 	closeC     chan struct{}
 
@@ -37,7 +35,7 @@ func (m *Mutex) defaultCallback(event, mname string, p MutexParams) {
 	if m.lockTag != nil {
 		tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
 	}
-	log.Printf("%s for %s %s%s", event, mname, m.Name, tagInfo)
+	log.Printf("%s for %s %s%s", event, mname, p.Name, tagInfo)
 	if p.AddStackTrace {
 		printStackTrace(debug.Stack())
 	}
@@ -48,7 +46,7 @@ func (m *Mutex) defaultCallback1(event, mname string, p MutexParams, r interface
 	if m.lockTag != nil {
 		tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
 	}
-	log.Printf("%s for %s %s%s: %v", event, mname, m.Name, tagInfo, r)
+	log.Printf("%s for %s %s%s: %v", event, mname, p.Name, tagInfo, r)
 	if p.AddStackTrace {
 		printStackTrace(debug.Stack())
 	}
@@ -65,7 +63,7 @@ type MutexParams struct {
 // NewMutex returns a pointer to a new Mutex with default callbacks assigned
 func NewMutex(p MutexParams) *Mutex {
 	const mname = "Mutex"
-	m := &Mutex{Name: p.Name}
+	m := &Mutex{}
 	haveWarningTimeout := p.Timeout > 0
 	if haveWarningTimeout {
 		m.ticker = time.NewTicker(p.Timeout)
@@ -98,8 +96,7 @@ func NewMutex(p MutexParams) *Mutex {
 							}()
 
 							if !lockedAtValue.IsZero() {
-								duration := time.Now().Sub(lockedAtValue)
-								if duration >= m.timeout {
+								if duration := time.Now().Sub(lockedAtValue); duration >= p.Timeout {
 									log.Printf("%s %s%s is locked for %s", mname, p.Name, tagInfo, duration)
 								}
 							}
@@ -108,7 +105,7 @@ func NewMutex(p MutexParams) *Mutex {
 						}
 					}
 				}()
-				m.ticker.Reset(m.timeout)
+				m.ticker.Reset(p.Timeout / 2)
 			}
 		}
 		m.BeforeUnlock = func() {
