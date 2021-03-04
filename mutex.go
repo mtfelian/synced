@@ -15,10 +15,11 @@ type Mutex struct {
 	callbacksMu sync.Mutex
 	Name        string
 
-	lockedAt time.Time
-	timeout  time.Duration
-	ticker   *time.Ticker
-	closeC   chan struct{}
+	lockedAt   time.Time
+	lockedAtMu sync.Mutex
+	timeout    time.Duration
+	ticker     *time.Ticker
+	closeC     chan struct{}
 
 	lockTag *string
 
@@ -76,7 +77,11 @@ func NewMutex(p MutexParams) *Mutex {
 			m.defaultCallback("AfterLock", mname, p)
 			if haveWarningTimeout {
 				m.closeC = make(chan struct{})
-				m.lockedAt = time.Now()
+				func() {
+					m.lockedAtMu.Lock()
+					defer m.lockedAtMu.Unlock()
+					m.lockedAt = time.Now()
+				}()
 				go func() {
 					for {
 						select {
@@ -85,7 +90,16 @@ func NewMutex(p MutexParams) *Mutex {
 							if m.lockTag != nil {
 								tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
 							}
-							log.Printf("%s %s%s is locked for %s", mname, p.Name, tagInfo, time.Now().Sub(m.lockedAt))
+							var lockedAtValue time.Time
+							func() {
+								m.lockedAtMu.Lock()
+								defer m.lockedAtMu.Unlock()
+								lockedAtValue = m.lockedAt
+							}()
+							if !lockedAtValue.IsZero() {
+								log.Printf("%s %s%s is locked for %s", mname, p.Name, tagInfo,
+									time.Now().Sub(lockedAtValue))
+							}
 						case <-m.closeC:
 							return
 						}
@@ -97,7 +111,11 @@ func NewMutex(p MutexParams) *Mutex {
 		m.BeforeUnlock = func() {
 			if haveWarningTimeout {
 				m.ticker.Stop()
-				m.lockedAt = time.Time{}
+				func() {
+					m.lockedAtMu.Lock()
+					defer m.lockedAtMu.Unlock()
+					m.lockedAt = time.Time{}
+				}()
 				m.closeC <- struct{}{}
 			}
 			m.defaultCallback("BeforeUnlock", mname, p)
