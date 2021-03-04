@@ -96,9 +96,12 @@ func NewMutex(p MutexParams) *Mutex {
 								defer m.lockedAtMu.Unlock()
 								lockedAtValue = m.lockedAt
 							}()
+
 							if !lockedAtValue.IsZero() {
-								log.Printf("%s %s%s is locked for %s", mname, p.Name, tagInfo,
-									time.Now().Sub(lockedAtValue))
+								duration := time.Now().Sub(lockedAtValue)
+								if duration >= m.timeout {
+									log.Printf("%s %s%s is locked for %s", mname, p.Name, tagInfo, duration)
+								}
 							}
 						case <-m.closeC:
 							return
