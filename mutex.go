@@ -19,7 +19,8 @@ type Mutex struct {
 	ticker     *time.Ticker
 	closeC     chan struct{}
 
-	lockTag *string
+	lockTagMu sync.Mutex
+	lockTag   *string
 
 	BeforeLock         func()
 	AfterLock          func()
@@ -32,9 +33,13 @@ func printStackTrace(b []byte) { log.Println("StackTrace: " + string(b)) }
 
 func (m *Mutex) defaultCallback(event, mname string, p MutexParams) {
 	var tagInfo string
-	if m.lockTag != nil {
-		tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
-	}
+	func() {
+		m.lockTagMu.Lock()
+		defer m.lockTagMu.Unlock()
+		if m.lockTag != nil {
+			tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
+		}
+	}()
 	log.Printf("%s for %s %s%s", event, mname, p.Name, tagInfo)
 	if p.AddStackTrace {
 		printStackTrace(debug.Stack())
@@ -43,9 +48,13 @@ func (m *Mutex) defaultCallback(event, mname string, p MutexParams) {
 
 func (m *Mutex) defaultCallback1(event, mname string, p MutexParams, r interface{}) {
 	var tagInfo string
-	if m.lockTag != nil {
-		tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
-	}
+	func() {
+		m.lockTagMu.Lock()
+		defer m.lockTagMu.Unlock()
+		if m.lockTag != nil {
+			tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
+		}
+	}()
 	log.Printf("%s for %s %s%s: %v", event, mname, p.Name, tagInfo, r)
 	if p.AddStackTrace {
 		printStackTrace(debug.Stack())
@@ -85,9 +94,13 @@ func NewMutex(p MutexParams) *Mutex {
 						select {
 						case <-m.ticker.C:
 							var tagInfo string
-							if m.lockTag != nil {
-								tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
-							}
+							func() {
+								m.lockTagMu.Lock()
+								defer m.lockTagMu.Unlock()
+								if m.lockTag != nil {
+									tagInfo = fmt.Sprintf(" (tag=%q)", *m.lockTag)
+								}
+							}()
 							var lockedAtValue time.Time
 							func() {
 								m.lockedAtMu.Lock()
@@ -140,9 +153,13 @@ func (m *Mutex) lock(tag *string) {
 	func() {
 		m.callbacksMu.Lock()
 		defer m.callbacksMu.Unlock()
-		if tag != nil {
-			m.lockTag = tag
-		}
+		func() {
+			m.lockTagMu.Lock()
+			defer m.lockTagMu.Unlock()
+			if tag != nil {
+				m.lockTag = tag
+			}
+		}()
 		if m.AfterLock != nil {
 			m.AfterLock()
 		}
@@ -182,7 +199,12 @@ func (m *Mutex) Unlock() {
 			}
 		}()
 	}()
-	m.lockTag = nil
+	func() {
+
+		m.lockTagMu.Lock()
+		defer m.lockTagMu.Unlock()
+		m.lockTag = nil
+	}()
 	m.mu.Unlock()
 
 	func() {
